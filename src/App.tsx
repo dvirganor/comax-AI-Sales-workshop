@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 var GOLD = "#E8B931";
 var DARK = "#0f0f1a";
