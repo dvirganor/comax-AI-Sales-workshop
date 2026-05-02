@@ -3,16 +3,26 @@ import React, { useState, useEffect } from "react";
 var GOLD = "#E8B931";
 var DARK = "#0f0f1a";
 var PASSWORD = "dvir1971";
-var SUPA_URL = "https://qoswnccfcpzrzesdhuky.supabase.co";
-var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvc3duY2NmY3B6cnplc2RodWt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMTMyMTcsImV4cCI6MjA4OTU4OTIxN30.MziqUUUzfInwgojcRyqqZgsKSt1a0MZ1uHUSqXf-lus";
+var UPSTASH_URL = "https://pretty-cod-113610.upstash.io";
+var UPSTASH_TOKEN = "gQAAAAAAAAAbvKAAIgcDE3YzM5MDUxMT1hN2Q0OGVjODVhODg1MmMwMTM1ZjM4Ng";
 
-function supaFetch(method, body) {
-  var opts = { method: method, headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY, "Content-Type": "application/json", "Prefer": "return=representation" } };
-  if (body) opts.body = JSON.stringify(body);
-  return fetch(SUPA_URL + "/rest/v1/workshop_state?id=eq.current", opts).then(function(r) { return r.json(); });
+function getState() {
+  return fetch(UPSTASH_URL + "/get/workshop_state", {
+    headers: { "Authorization": "Bearer " + UPSTASH_TOKEN }
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data && data.result) {
+      return JSON.parse(data.result);
+    }
+    return { session_id: 0, slide_index: 0 };
+  }).catch(function() { return { session_id: 0, slide_index: 0 }; });
 }
-function getState() { return supaFetch("GET"); }
-function setState(sid, si) { return supaFetch("PATCH", { session_id: sid, slide_index: si, updated_at: new Date().toISOString() }); }
+
+function setState(sid, si) {
+  var val = JSON.stringify({ session_id: sid, slide_index: si });
+  return fetch(UPSTASH_URL + "/set/workshop_state/" + encodeURIComponent(val), {
+    headers: { "Authorization": "Bearer " + UPSTASH_TOKEN }
+  }).then(function(r) { return r.json(); }).catch(function() {});
+}
 
 /* ===== COMPONENTS ===== */
 function Txt(p) {
@@ -160,7 +170,7 @@ function SlideView(props) {
   var _c = useState(props.initialSlide || 0), cur = _c[0], setCur = _c[1];
   var ses = SESSIONS.find(function(s) { return s.id === props.session; }); var sl = ses.slides; var s = sl[cur]; var isP = props.isP;
   useEffect(function() { if (!isP) return; setState(props.session, cur).catch(function() {}); }, [isP, props.session, cur]);
-  useEffect(function() { if (isP) return; function poll() { getState().then(function(d) { if (d && d.length > 0 && d[0].session_id === props.session) setCur(d[0].slide_index); }).catch(function() {}); } poll(); var i = setInterval(poll, 1500); return function() { clearInterval(i); }; }, [isP, props.session]);
+  useEffect(function() { if (isP) return; function poll() { getState().then(function(d) { if (d && d.session_id === props.session) setCur(d.slide_index); }).catch(function() {}); } poll(); var i = setInterval(poll, 1500); return function() { clearInterval(i); }; }, [isP, props.session]);
   useEffect(function() { if (!isP) return; function h(e) { if (e.key === "ArrowLeft") setCur(function(p) { return Math.min(p + 1, sl.length - 1); }); if (e.key === "ArrowRight") setCur(function(p) { return Math.max(p - 1, 0); }); } window.addEventListener("keydown", h); return function() { window.removeEventListener("keydown", h); }; }, [isP, sl.length]);
 
   var dotsEl = sl.map(function(_, i) { return React.createElement("div", { key: i, onClick: isP ? function() { setCur(i); } : undefined, style: { width: i === cur ? 18 : 6, height: 6, borderRadius: 3, background: i === cur ? GOLD : "#333", cursor: isP ? "pointer" : "default", transition: "all 0.3s" } }); });
@@ -226,7 +236,7 @@ export default function App() {
           React.createElement("div", { style: { textAlign: "center", color: "#555", fontSize: 12, marginTop: 20, paddingTop: 16, borderTop: "1px solid #2a2a4a" } }, "סדנת AI למכירות שטח – Comax")));
     }
   }
-  useEffect(function() { if (!isViewer) return; function check() { getState().then(function(d) { if (d && d.length > 0 && d[0].session_id > 0) { setVSes(d[0].session_id); setVSl(d[0].slide_index); } else { setVSes(null); } }).catch(function() {}); } check(); var i = setInterval(check, 2000); return function() { clearInterval(i); }; }, [isViewer]);
+  useEffect(function() { if (!isViewer) return; function check() { getState().then(function(d) { if (d && d.session_id > 0) { setVSes(d.session_id); setVSl(d.slide_index); } else { setVSes(null); } }).catch(function() {}); } check(); var i = setInterval(check, 2000); return function() { clearInterval(i); }; }, [isViewer]);
   function start(id) { setSes(id); setState(id, 0).catch(function() {}); }
   function back() { setSes(null); setState(0, 0).catch(function() {}); }
   if (isViewer) { if (vSes && vSes > 0) return React.createElement(SlideView, { session: vSes, isP: false, onBack: function() {}, initialSlide: vSl }); return React.createElement(WaitingScreen); }
