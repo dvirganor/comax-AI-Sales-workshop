@@ -214,7 +214,7 @@ export default function App() {
   var isPrint = params ? params.get("print") === "true" : false;
   var printSession = params ? parseInt(params.get("session") || "0") : 0;
 
-  // PRINT MODE: all slides in sequence
+  // PRINT MODE
   if (isPrint && printSession > 0) {
     var pSes = SESSIONS.find(function(s) { return s.id === printSession; });
     if (pSes) {
