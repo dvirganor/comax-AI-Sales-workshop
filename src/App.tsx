@@ -123,8 +123,14 @@ var SESSIONS = [
 ];
 
 /* ===== EXPORT ===== */
-function exportHTML(sid) { var s = SESSIONS.find(function(x) { return x.id === sid; }); var h = '<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>Comax - מפגש ' + s.id + '</title><style>body{background:#0f0f1a;font-family:sans-serif;direction:rtl;padding:20px}.s{max-width:800px;margin:20px auto;background:#1a1a2e;border-radius:16px;padding:30px;border:1px solid #2a2a4a;min-height:300px;page-break-after:always}.g{color:#E8B931}.n{text-align:center;color:#888;font-size:12px;margin:8px 0}</style></head><body><div style="text-align:center;color:#E8B931;font-size:22px;font-weight:800;padding:20px">COMAX × AI | מפגש ' + s.id + '</div>'; s.slides.forEach(function(sl, i) { h += '<div class="s"><div style="color:#E8B931;font-size:16px;font-weight:700;text-align:right">שקף ' + (i + 1) + '</div></div><div class="n">' + (i + 1) + '/' + s.slides.length + '</div>'; }); h += '</body></html>'; var b = new Blob([h], { type: "text/html;charset=utf-8" }); var u = URL.createObjectURL(b); var a = document.createElement("a"); a.href = u; a.download = "comax-session-" + sid + ".html"; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
-function printSession(sid) { var s = SESSIONS.find(function(x) { return x.id === sid; }); var w = window.open("", "_blank"); var h = '<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>Comax - מפגש ' + s.id + '</title><style>body{font-family:sans-serif;direction:rtl;padding:20px}.p{border:2px solid #E8B931;border-radius:12px;padding:20px;margin:0 0 20px;page-break-after:always}h2{color:#E8B931;font-size:16px}.nt{background:#f9f5e8;border-right:4px solid #E8B931;padding:12px;border-radius:6px;font-size:13px;line-height:1.8}</style></head><body><div style="text-align:center;font-size:20px;font-weight:800;color:#E8B931;border-bottom:2px solid #E8B931;padding-bottom:10px;margin-bottom:20px">COMAX × AI | מפגש ' + s.id + ': "' + s.title + '"</div>'; s.slides.forEach(function(sl, i) { var nt = (sl.n || "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>"); h += '<div class="p"><h2>שקף ' + (i + 1) + '/' + s.slides.length + '</h2><div class="nt"><b>🎤 הערות:</b><br>' + nt + '</div></div>'; }); h += '<script>setTimeout(function(){window.print()},500)<\/script></body></html>'; w.document.write(h); w.document.close(); }
+function exportHTML(sid) {
+  var url = window.location.origin + window.location.pathname + "?print=true&session=" + sid;
+  window.open(url, "_blank");
+}
+function printSession(sid) {
+  var url = window.location.origin + window.location.pathname + "?print=true&session=" + sid;
+  window.open(url, "_blank");
+}
 
 /* ===== SCREENS ===== */
 function WaitingScreen() {
@@ -195,6 +201,31 @@ export default function App() {
   var _p = useState(false), isP = _p[0], setIsP = _p[1]; var _s = useState(null), ses = _s[0], setSes = _s[1]; var _v = useState(null), vSes = _v[0], setVSes = _v[1]; var _vs = useState(0), vSl = _vs[0], setVSl = _vs[1];
   var params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   var isViewer = params ? params.get("view") === "true" : false;
+  var isPrint = params ? params.get("print") === "true" : false;
+  var printSession = params ? parseInt(params.get("session") || "0") : 0;
+
+  // PRINT MODE: all slides in sequence
+  if (isPrint && printSession > 0) {
+    var pSes = SESSIONS.find(function(s) { return s.id === printSession; });
+    if (pSes) {
+      return React.createElement("div", { style: { width: "100%", background: DARK, fontFamily: "'Segoe UI',sans-serif", direction: "rtl", padding: "20px" } },
+        React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } },
+          React.createElement("div", { style: { textAlign: "center", marginBottom: 24 } },
+            React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: GOLD, letterSpacing: 2 } }, "COMAX × AI"),
+            React.createElement("div", { style: { fontSize: 18, color: "#fff", marginTop: 6 } }, "מפגש " + pSes.id + ": \"" + pSes.title + "\""),
+            React.createElement("div", { style: { fontSize: 13, color: "#888", marginTop: 4 } }, pSes.sub + " | " + pSes.slides.length + " שקפים"),
+            React.createElement("div", { style: { display: "flex", gap: 10, justifyContent: "center", marginTop: 12 } },
+              React.createElement("button", { onClick: function() { window.print(); }, style: { background: GOLD, color: "#1a1a2e", border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer" } }, "🖨️ הדפס / שמור PDF"),
+              React.createElement("button", { onClick: function() { window.close(); }, style: { background: "rgba(255,255,255,0.06)", color: "#aaa", border: "1px solid #333", borderRadius: 8, padding: "8px 20px", fontSize: 14, cursor: "pointer" } }, "✕ סגור"))),
+          pSes.slides.map(function(sl, i) {
+            return React.createElement("div", { key: i, style: { marginBottom: 20, pageBreakAfter: "always" } },
+              React.createElement("div", { style: { fontSize: 12, color: GOLD, fontWeight: 700, marginBottom: 6, textAlign: "right" } }, "שקף " + (i + 1) + " מתוך " + pSes.slides.length),
+              React.createElement("div", { style: { background: "linear-gradient(145deg,#1a1a2e,#16213e)", borderRadius: 16, width: "100%", aspectRatio: "16/9", padding: "clamp(16px, 3vw, 36px)", boxSizing: "border-box", border: "1px solid #2a2a4a", overflow: "hidden", position: "relative" } },
+                React.createElement("div", { style: { height: "100%", position: "relative", zIndex: 1, overflow: "auto" } }, sl.c)));
+          }),
+          React.createElement("div", { style: { textAlign: "center", color: "#555", fontSize: 12, marginTop: 20, paddingTop: 16, borderTop: "1px solid #2a2a4a" } }, "סדנת AI למכירות שטח – Comax")));
+    }
+  }
   useEffect(function() { if (!isViewer) return; function check() { getState().then(function(d) { if (d && d.length > 0 && d[0].session_id > 0) { setVSes(d[0].session_id); setVSl(d[0].slide_index); } else { setVSes(null); } }).catch(function() {}); } check(); var i = setInterval(check, 2000); return function() { clearInterval(i); }; }, [isViewer]);
   function start(id) { setSes(id); setState(id, 0).catch(function() {}); }
   function back() { setSes(null); setState(0, 0).catch(function() {}); }
