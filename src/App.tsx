@@ -3,25 +3,49 @@ import React, { useState, useEffect } from "react";
 var GOLD = "#E8B931";
 var DARK = "#0f0f1a";
 var PASSWORD = "dvir1971";
+
+// ========== Upstash KV - שני טוקנים נפרדים ==========
+// WRITE: למנחה (קריאה+כתיבה). READ: לצופים (קריאה בלבד).
+// ⚠️ חובה לרענן ב-Vercel אחרי הסדנה!
 var UPSTASH_URL = "https://pretty-cod-113610.upstash.io";
-var UPSTASH_TOKEN = "gQAAAAAAAAAbvKAAIgcDE3YzM5MDUxMT1hN2Q0OGVjODVhODg1MmMwMTM1ZjM4Ng";
+var UPSTASH_WRITE_TOKEN = "gQAAAAAAAbvKAAIgcDE3YzM5MDUxMTlhN2Q0OGVjODVhODg1MmMwMTM1ZjM4Ng";
+var UPSTASH_READ_TOKEN = "ggAAAAAAAbvKAAIgcDHncmCD6AG-f1_Di3_QKUmpZB_njQvFv57OZwfrYgSVMQ";
 
 function getState() {
   return fetch(UPSTASH_URL + "/get/workshop_state", {
-    headers: { "Authorization": "Bearer " + UPSTASH_TOKEN }
-  }).then(function(r) { return r.json(); }).then(function(data) {
+    headers: { "Authorization": "Bearer " + UPSTASH_READ_TOKEN }
+  }).then(function(r) {
+    if (!r.ok) {
+      console.error("❌ getState HTTP", r.status);
+      return null;
+    }
+    return r.json();
+  }).then(function(data) {
     if (data && data.result) {
-      return JSON.parse(data.result);
+      try { return JSON.parse(data.result); }
+      catch(e) { return { session_id: 0, slide_index: 0 }; }
     }
     return { session_id: 0, slide_index: 0 };
-  }).catch(function() { return { session_id: 0, slide_index: 0 }; });
+  }).catch(function(e) {
+    console.error("❌ getState error:", e);
+    return { session_id: 0, slide_index: 0 };
+  });
 }
 
 function setState(sid, si) {
   var val = JSON.stringify({ session_id: sid, slide_index: si });
   return fetch(UPSTASH_URL + "/set/workshop_state/" + encodeURIComponent(val), {
-    headers: { "Authorization": "Bearer " + UPSTASH_TOKEN }
-  }).then(function(r) { return r.json(); }).catch(function() {});
+    headers: { "Authorization": "Bearer " + UPSTASH_WRITE_TOKEN }
+  }).then(function(r) {
+    if (!r.ok) {
+      console.error("❌ setState HTTP", r.status);
+    } else {
+      console.log("✅ synced session=" + sid + " slide=" + si);
+    }
+    return r.json();
+  }).catch(function(e) {
+    console.error("❌ setState error:", e);
+  });
 }
 
 /* ===== COMPONENTS ===== */
@@ -134,11 +158,13 @@ var SESSIONS = [
 
 /* ===== EXPORT ===== */
 function exportHTML(sid) {
-  var url = window.location.origin + window.location.pathname + "?print=true&session=" + sid;
+  var origin = window.location.origin + window.location.pathname.replace(/\?.*/, "");
+  var url = origin + "?print=true&session=" + sid;
   window.open(url, "_blank");
 }
 function printSession(sid) {
-  var url = window.location.origin + window.location.pathname + "?print=true&session=" + sid;
+  var origin = window.location.origin + window.location.pathname.replace(/\?.*/, "");
+  var url = origin + "?print=true&session=" + sid;
   window.open(url, "_blank");
 }
 
@@ -212,11 +238,11 @@ export default function App() {
   var params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   var isViewer = params ? params.get("view") === "true" : false;
   var isPrint = params ? params.get("print") === "true" : false;
-  var printSession = params ? parseInt(params.get("session") || "0") : 0;
+  var printSessionId = params ? parseInt(params.get("session") || "0") : 0;
 
   // PRINT MODE
-  if (isPrint && printSession > 0) {
-    var pSes = SESSIONS.find(function(s) { return s.id === printSession; });
+  if (isPrint && printSessionId > 0) {
+    var pSes = SESSIONS.find(function(s) { return s.id === printSessionId; });
     if (pSes) {
       return React.createElement("div", { style: { width: "100%", background: DARK, fontFamily: "'Segoe UI',sans-serif", direction: "rtl", padding: "20px" } },
         React.createElement("div", { style: { maxWidth: 900, margin: "0 auto" } },
