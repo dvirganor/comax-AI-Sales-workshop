@@ -195,6 +195,12 @@ function Dashboard(p) {
 function SlideView(props) {
   var _c = useState(props.initialSlide || 0), cur = _c[0], setCur = _c[1];
   var ses = SESSIONS.find(function(s) { return s.id === props.session; }); var sl = ses.slides; var s = sl[cur]; var isP = props.isP;
+  // 🆕 התיקון: צופה מתעדכן כשמקבל initialSlide חדש מ-App הראשי
+  useEffect(function() {
+    if (!isP && typeof props.initialSlide === "number") {
+      setCur(props.initialSlide);
+    }
+  }, [props.initialSlide, isP]);
   useEffect(function() { if (!isP) return; setState(props.session, cur).catch(function() {}); }, [isP, props.session, cur]);
   useEffect(function() { if (isP) return; function poll() { getState().then(function(d) { if (d && d.session_id === props.session) setCur(d.slide_index); }).catch(function() {}); } poll(); var i = setInterval(poll, 1500); return function() { clearInterval(i); }; }, [isP, props.session]);
   useEffect(function() { if (!isP) return; function h(e) { if (e.key === "ArrowLeft") setCur(function(p) { return Math.min(p + 1, sl.length - 1); }); if (e.key === "ArrowRight") setCur(function(p) { return Math.max(p - 1, 0); }); } window.addEventListener("keydown", h); return function() { window.removeEventListener("keydown", h); }; }, [isP, sl.length]);
