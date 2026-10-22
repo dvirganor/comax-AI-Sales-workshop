@@ -282,3 +282,47 @@ def test_server_refresh(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ---------- איתור פיד RSS ----------
+
+class _Resp:
+    def __init__(self, status, content=b""):
+        self.status_code, self.content = status, content
+        self.text = content.decode("utf-8", "replace")
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"{self.status_code} error")
+
+
+class _FakeSession:
+    def __init__(self, pages):
+        self.pages, self.requested = pages, []
+
+    def get(self, url, timeout=None):
+        self.requested.append(url)
+        return self.pages.get(url, _Resp(404))
+
+
+def test_rss_discovery_from_homepage_link():
+    home = b'<html><head><link rel="alternate" type="application/rss+xml" href="/news/rss.xml"></head></html>'
+    session = _FakeSession({"https://site.co.il/": _Resp(200, home), "https://site.co.il/news/rss.xml": _Resp(200, RSS)})
+    items = rss.fetch(session, "s", "https://site.co.il/feed/", 5, include_unmatched=True)
+    assert len(items) == 1 and items[0].include_unmatched
+
+
+def test_rss_discovery_common_path_and_failure():
+    session = _FakeSession({"https://site.co.il/": _Resp(200, b"<html></html>"), "https://site.co.il/rss": _Resp(200, RSS)})
+    assert len(rss.fetch(session, "s", "https://site.co.il/", 5)) == 1
+    with pytest.raises(RuntimeError, match="404"):
+        rss.fetch(_FakeSession({}), "s", "https://nothing.co.il/feed", 5)
+    with pytest.raises(ValueError, match="לא נמצא פיד"):
+        rss.fetch(_FakeSession({"https://x.co.il/": _Resp(200, b"<html></html>")}), "s", "https://x.co.il/", 5)
+
+
+def test_report_sources_panel(matcher):
+    page = report.render([], matcher.group_labels, matcher.tag_labels, NOW,
+                         sources={"ynet": 30, "כלכליסט": "403 Forbidden"})
+    assert "מצב מקורות: 1 מתוך 2 תקינים" in page
+    assert "✓ ynet: 30 פריטים" in page and "✗ כלכליסט: 403 Forbidden" in page

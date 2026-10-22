@@ -27,7 +27,9 @@ def _setup_logging(log_dir) -> None:
         RotatingFileHandler(log_dir / "monitor.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8")
     ]
     if sys.stderr is not None:  # pythonw (ריצה מתוזמנת ללא חלון) - אין קונסולה
-        handlers.append(logging.StreamHandler())
+        console = logging.StreamHandler()
+        console.setLevel(logging.WARNING)  # פירוט מלא נשמר ב-logs\monitor.log
+        handlers.append(console)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=handlers)
 
 

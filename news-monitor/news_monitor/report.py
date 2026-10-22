@@ -27,6 +27,11 @@ font:inherit;font-size:14px;font-weight:600;white-space:nowrap}
 #refresh-note{color:var(--muted);font-size:12.5px;margin-top:4px;text-align:left}
 .meta{color:var(--muted);font-size:13px}
 .warn{color:var(--cyber);font-size:13px;margin-top:4px}
+details.sources{font-size:12.5px;color:var(--muted);margin-top:4px}
+details.sources summary{cursor:pointer}
+details.sources ul{margin:6px 0;padding-inline-start:18px;columns:2;column-gap:24px}
+details.sources li{break-inside:avoid}
+details.sources .bad{color:var(--cyber)}
 .filters{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
 .filters button{border:1px solid var(--line);background:var(--chip);color:var(--text);border-radius:999px;
 padding:4px 12px;cursor:pointer;font:inherit;font-size:13px}
@@ -99,6 +104,7 @@ def render(
     generated_at: datetime,
     run_started: datetime | None = None,
     failed_sources: list[str] | None = None,
+    sources: dict[str, int | str] | None = None,
 ) -> str:
     esc = html.escape
     buttons = ['<button class="on" data-filter="group" data-value="all">הכל</button>']
@@ -151,6 +157,16 @@ def render(
         if google:
             names.insert(0, f"Google News ({len(google)} חיפושים)" if len(google) > 1 else google[0])
         warn = f'<div class="warn">⚠ מקורות שנכשלו בסריקה האחרונה: {esc(", ".join(names))}</div>'
+    if sources:
+        # ערך מספרי = כמות פריטים שהתקבלו; מחרוזת = הודעת שגיאה
+        ok = sum(1 for v in sources.values() if isinstance(v, int))
+        rows = "".join(
+            f"<li>✓ {esc(name)}: {value} פריטים</li>" if isinstance(value, int)
+            else f'<li class="bad">✗ {esc(name)}: {esc(str(value))}</li>'
+            for name, value in sources.items()
+        )
+        warn += (f'<details class="sources"><summary>מצב מקורות: {ok} מתוך {len(sources)} תקינים</summary>'
+                 f"<ul>{rows}</ul></details>")
 
     return f"""<!doctype html>
 <html lang="he" dir="rtl">

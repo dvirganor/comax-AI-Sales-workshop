@@ -103,6 +103,7 @@ def write_report(config: dict, paths: Paths, store: Store, matcher: Matcher, now
         generated_at=now,
         run_started=run_started,
         failed_sources=status.get("failed_sources"),
+        sources=status.get("sources"),
     )
     report.write(paths.report, page)
 
