@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from news_monitor import report, telegram_bot
+from news_monitor import report
 from news_monitor.config import load_config
 from news_monitor.matcher import GENERAL_CYBER_GROUP, Matcher, compile_term
 from news_monitor.models import Item
@@ -164,9 +164,9 @@ def test_process_dedupes(matcher, store):
     assert [i.title for i in new] == ["שופרסל מוכרת סניפים"]
     # סריקה נוספת - אותו פריט לא נחשב חדש
     assert process(results, matcher, store, NOW + timedelta(hours=1), 72) == []
-    [pending] = store.pending_notifications()
+    [stored] = store.recent(7, now=NOW)
     # המקור השני נשמר כקישור נוסף, פעם אחת בלבד
-    assert pending.extra_links == [("B", "https://b/2")]
+    assert stored.extra_links == [("B", "https://b/2")]
 
 
 def test_extra_sources_across_runs(matcher, store):
@@ -183,16 +183,6 @@ def test_extra_sources_across_runs(matcher, store):
     assert item.extra_links == [("ynet", "https://ynet/9"), ("כלכליסט", "https://calcalist/5")]
     page = report.render([item], matcher.group_labels, matcher.tag_labels, NOW)
     assert "גם ב:" in page and 'href="https://ynet/9"' in page
-    msg = telegram_bot.format_item(item, matcher.tag_labels)
-    assert '<a href="https://calcalist/5">כלכליסט</a>' in msg
-
-
-def test_pending_cleared(matcher, store):
-    results = [SourceResult("a", [Item("שופרסל מוכרת סניפים", "https://a/1", "A", NOW)])]
-    new = process(results, matcher, store, NOW, 72)
-    assert len(store.pending_notifications()) == 1
-    store.mark_notified([new[0].id])
-    assert store.pending_notifications() == []
 
 
 @pytest.mark.parametrize(
@@ -215,14 +205,6 @@ def test_schedule(config, dt, expected):
 def _stored(store, matcher, title, url):
     item = Item(title, url, "גלובס", NOW)
     return store.add(item, matcher.analyze(item), NOW)
-
-
-def test_telegram_messages_split(matcher, store):
-    items = [_stored(store, matcher, f"שופרסל <ידיעה> מספר {i} " + "x" * 150, f"https://a/{i}") for i in range(40)]
-    msgs = telegram_bot.build_messages(items, matcher.group_labels, matcher.tag_labels)
-    assert len(msgs) > 1
-    assert all(len(m) <= telegram_bot.MAX_LEN for m in msgs)
-    assert "&lt;ידיעה&gt;" in msgs[0] and msgs[0].startswith("🔔 <b>40")
 
 
 def test_report_render(matcher, store):
@@ -263,7 +245,7 @@ def test_server_refresh(tmp_path, monkeypatch):
     release = threading.Event()
     calls = []
 
-    def fake_run(config, secrets, paths_, force):
+    def fake_run(config, paths_, force):
         calls.append(force)
         release.wait(5)
         return RunResult(new_items=[])

@@ -1,10 +1,8 @@
 """שורת פקודה: python -m news_monitor <פקודה>
 
-  run [--force] [--no-telegram]   סריקה (מחוץ לשעות 08-18 א'-ה' מדלג, אלא אם --force)
+  run [--force]                   סריקה (מחוץ לשעות 08-18 א'-ה' מדלג, אלא אם --force)
   check-sources                   בדיקת כל המקורות והצגת מספר הפריטים מכל אחד
   report                          יצירה מחדש של דוח ה-HTML
-  telegram-chat-id                הצגת ה-chat_id של מי שכתב לבוט
-  telegram-test                   שליחת הודעת בדיקה לבוט
   serve                           שרת מקומי: הדוח + כפתור "רענן עכשיו" (http://127.0.0.1:8765)
 """
 
@@ -16,8 +14,8 @@ import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from . import pipeline, server, telegram_bot
-from .config import load_config, load_secrets, paths
+from . import pipeline, server
+from .config import load_config, paths
 from .matcher import Matcher
 from .sources import fetch_all
 from .store import Store
@@ -48,21 +46,17 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     run_p = sub.add_parser("run")
     run_p.add_argument("--force", action="store_true", help="להריץ גם מחוץ לחלון הזמנים")
-    run_p.add_argument("--no-telegram", action="store_true", help="לא לשלוח לבוט")
     sub.add_parser("check-sources")
     sub.add_parser("report")
-    sub.add_parser("telegram-chat-id")
-    sub.add_parser("telegram-test")
     sub.add_parser("serve")
     args = parser.parse_args(argv)
 
     config = load_config()
-    secrets = load_secrets()
     p = paths(config)
     _setup_logging(p.logs)
 
     if args.cmd == "run":
-        result = pipeline.run(config, secrets, p, force=args.force, send_telegram=not args.no_telegram)
+        result = pipeline.run(config, p, force=args.force)
         if result.busy:
             _print("סריקה אחרת כבר רצה - נסה שוב בעוד דקה.")
         elif not result.skipped:
@@ -88,24 +82,6 @@ def main(argv: list[str] | None = None) -> int:
         _print(f"הדוח נוצר: {p.report}")
         return 0
 
-    token = secrets["telegram"]["bot_token"]
-    if not token:
-        _print("חסר bot_token בקובץ secrets.yaml")
-        return 1
-
-    if args.cmd == "telegram-chat-id":
-        chats = telegram_bot.list_chats(token)
-        if not chats:
-            _print("לא נמצאו הודעות. שלח הודעה כלשהי לבוט בטלגרם ונסה שוב.")
-            return 1
-        for chat_id, name in chats:
-            _print(f"chat_id: {chat_id}   ({name})")
-        return 0
-
-    if args.cmd == "telegram-test":
-        telegram_bot.send_text(token, secrets["telegram"]["chat_id"], "✅ הודעת בדיקה ממערכת ניטור החדשות")
-        _print("נשלח.")
-        return 0
     return 1
 
 

@@ -17,11 +17,6 @@ $py = Join-Path $Root '.venv\Scripts\python.exe'
 & $py -m pip install -r requirements.txt --quiet
 if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
 
-if (-not (Test-Path 'secrets.yaml')) {
-    Copy-Item 'secrets.example.yaml' 'secrets.yaml'
-    Write-Host 'Created secrets.yaml - fill in the Telegram bot token and chat_id.'
-}
-
 & (Join-Path $PSScriptRoot 'register_task.ps1')
 Write-Host ''
 Write-Host 'Installation complete.'

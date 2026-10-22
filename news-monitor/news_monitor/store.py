@@ -23,8 +23,7 @@ CREATE TABLE IF NOT EXISTS items (
     first_seen TEXT NOT NULL,
     entities   TEXT NOT NULL,
     groups_    TEXT NOT NULL,
-    tags       TEXT NOT NULL,
-    notified   INTEGER NOT NULL DEFAULT 0
+    tags       TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_title_key ON items(title_key);
 CREATE INDEX IF NOT EXISTS idx_items_first_seen ON items(first_seen);
@@ -77,9 +76,6 @@ class Store:
 
     def close(self) -> None:
         self.db.close()
-
-    def is_empty(self) -> bool:
-        return self.db.execute("SELECT 1 FROM items LIMIT 1").fetchone() is None
 
     def find(self, item: Item, dedupe_days: int = 7, now: datetime | None = None) -> str | None:
         """מחזיר את המזהה של ידיעה קיימת זהה (לפי קישור או כותרת), אם יש."""
@@ -135,13 +131,6 @@ class Store:
         )
         self.db.commit()
         return stored
-
-    def mark_notified(self, ids: list[str]) -> None:
-        self.db.executemany("UPDATE items SET notified = 1 WHERE id = ?", [(i,) for i in ids])
-        self.db.commit()
-
-    def pending_notifications(self) -> list[StoredItem]:
-        return self._query("WHERE notified = 0 ORDER BY first_seen")
 
     def recent(self, days: int, now: datetime | None = None) -> list[StoredItem]:
         now = now or datetime.now().astimezone()

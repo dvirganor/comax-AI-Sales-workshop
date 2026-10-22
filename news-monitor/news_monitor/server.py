@@ -12,7 +12,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import pipeline
-from .config import Paths, load_config, load_secrets
+from .config import Paths, load_config
 from .matcher import Matcher
 from .store import Store
 
@@ -49,7 +49,7 @@ class RefreshController:
     def _work(self) -> None:
         try:
             # קובץ ההגדרות נקרא מחדש בכל סריקה, כך ששינויים נכנסים לתוקף בלי להפעיל את השרת מחדש
-            result = self._run(load_config(), load_secrets(), self.paths, force=True)
+            result = self._run(load_config(), self.paths, force=True)
             if result.busy:
                 self.message = "סריקה אחרת כבר רצה"
             else:
