@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from . import report, telegram_bot
 from .config import Paths
@@ -19,9 +23,36 @@ log = logging.getLogger(__name__)
 @dataclass
 class RunResult:
     skipped: bool = False
+    # סריקה אחרת (מתוזמנת או ידנית) כבר רצה
+    busy: bool = False
     new_items: list[StoredItem] = field(default_factory=list)
     failed_sources: list[str] = field(default_factory=list)
     first_run: bool = False
+
+
+LOCK_STALE_SECONDS = 30 * 60
+
+
+@contextmanager
+def run_lock(path: Path):
+    """נעילה בין תהליכים: מונעת סריקה מתוזמנת וסריקה ידנית במקביל. מחזיר False אם נעול."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if time.time() - path.stat().st_mtime > LOCK_STALE_SECONDS:
+            path.unlink(missing_ok=True)  # נעילה שנשארה מתהליך שקרס
+    except FileNotFoundError:
+        pass
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        yield False
+        return
+    try:
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        yield True
+    finally:
+        path.unlink(missing_ok=True)
 
 
 def in_schedule(config: dict, now: datetime) -> bool:
@@ -109,6 +140,14 @@ def run(config: dict, secrets: dict, paths: Paths, force: bool = False, send_tel
         log.info("מחוץ לחלון הזמנים (%s) - דילוג", now.strftime("%a %H:%M"))
         return RunResult(skipped=True)
 
+    with run_lock(paths.lock) as acquired:
+        if not acquired:
+            log.info("סריקה אחרת כבר רצה - דילוג")
+            return RunResult(skipped=True, busy=True)
+        return _run(config, secrets, paths, now, send_telegram)
+
+
+def _run(config: dict, secrets: dict, paths: Paths, now: datetime, send_telegram: bool) -> RunResult:
     paths.db.parent.mkdir(parents=True, exist_ok=True)
     store = Store(str(paths.db))
     try:

@@ -15,6 +15,7 @@ class Paths:
     db: Path
     report: Path
     status: Path
+    lock: Path
     logs: Path
 
 
@@ -45,5 +46,6 @@ def paths(config: dict, base: Path = BASE_DIR) -> Paths:
         db=data / "news.db",
         report=base / config["report"]["path"],
         status=data / "status.json",
+        lock=data / "run.lock",
         logs=base / "logs",
     )

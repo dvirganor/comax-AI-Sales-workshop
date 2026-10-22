@@ -5,6 +5,7 @@
   report                          יצירה מחדש של דוח ה-HTML
   telegram-chat-id                הצגת ה-chat_id של מי שכתב לבוט
   telegram-test                   שליחת הודעת בדיקה לבוט
+  serve                           שרת מקומי: הדוח + כפתור "רענן עכשיו" (http://127.0.0.1:8765)
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from . import pipeline, telegram_bot
+from . import pipeline, server, telegram_bot
 from .config import load_config, load_secrets, paths
 from .matcher import Matcher
 from .sources import fetch_all
@@ -52,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("report")
     sub.add_parser("telegram-chat-id")
     sub.add_parser("telegram-test")
+    sub.add_parser("serve")
     args = parser.parse_args(argv)
 
     config = load_config()
@@ -61,8 +63,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "run":
         result = pipeline.run(config, secrets, p, force=args.force, send_telegram=not args.no_telegram)
-        if not result.skipped:
+        if result.busy:
+            _print("סריקה אחרת כבר רצה - נסה שוב בעוד דקה.")
+        elif not result.skipped:
             _print(f"נמצאו {len(result.new_items)} ידיעות חדשות. דוח: {p.report}")
+        return 0
+
+    if args.cmd == "serve":
+        server.serve(p, config.get("server", {}).get("port", 8765))
         return 0
 
     if args.cmd == "check-sources":

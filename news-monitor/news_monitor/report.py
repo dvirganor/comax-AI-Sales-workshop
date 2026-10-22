@@ -20,6 +20,11 @@ _CSS = """
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 "Segoe UI",Arial,sans-serif}
 header{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px;z-index:2}
 h1{margin:0 0 4px;font-size:20px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+#refresh{border:0;background:var(--accent);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;
+font:inherit;font-size:14px;font-weight:600;white-space:nowrap}
+#refresh:disabled{opacity:.7;cursor:wait}
+#refresh-note{color:var(--muted);font-size:12.5px;margin-top:4px;text-align:left}
 .meta{color:var(--muted);font-size:13px}
 .warn{color:var(--cyber);font-size:13px;margin-top:4px}
 .filters{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
@@ -57,6 +62,25 @@ document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{const k=b.d
  state[k]=b.dataset.value;document.querySelectorAll(`[data-filter=${k}]`).forEach(x=>x.classList.toggle('on',x===b));apply();});
 document.getElementById('q').oninput=e=>{state.q=e.target.value.trim().toLowerCase();apply();};
 apply();
+
+const btn=document.getElementById('refresh'),note=document.getElementById('refresh-note');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function busy(){btn.disabled=true;btn.textContent='⏳ סורק...';note.textContent='הסריקה לוקחת בדרך כלל פחות מדקה';}
+async function waitDone(){
+ for(;;){await sleep(2000);
+  try{const s=await (await fetch('/api/status',{cache:'no-store'})).json();
+   if(!s.running){location.reload();return;}}
+  catch(e){btn.disabled=false;btn.textContent='🔄 רענן עכשיו';note.textContent='השרת המקומי לא מגיב';return;}}}
+btn.onclick=async()=>{
+ if(location.protocol==='file:'){
+  note.textContent='לסריקה מיידית פתח את הדוח דרך scripts\\\\open_report.bat (או הרץ run_now.bat)';return;}
+ busy();
+ try{const r=await fetch('/api/refresh',{method:'POST',headers:{'X-Requested-With':'news-monitor'}});
+  if(r.status!==202&&r.status!==409)throw new Error(r.status);
+  waitDone();}
+ catch(e){btn.disabled=false;btn.textContent='🔄 רענן עכשיו';note.textContent='לא ניתן להפעיל סריקה: '+e.message;}};
+if(location.protocol!=='file:'){fetch('/api/status',{cache:'no-store'}).then(r=>r.json())
+ .then(s=>{if(s.running){busy();waitDone();}else if(s.message)note.textContent=s.message;}).catch(()=>{});}
 """
 
 
@@ -122,7 +146,11 @@ def render(
 
     warn = ""
     if failed_sources:
-        warn = f'<div class="warn">⚠ מקורות שנכשלו בסריקה האחרונה: {esc(", ".join(failed_sources))}</div>'
+        google = [s for s in failed_sources if s.startswith("Google News")]
+        names = [s for s in failed_sources if not s.startswith("Google News")]
+        if google:
+            names.insert(0, f"Google News ({len(google)} חיפושים)" if len(google) > 1 else google[0])
+        warn = f'<div class="warn">⚠ מקורות שנכשלו בסריקה האחרונה: {esc(", ".join(names))}</div>'
 
     return f"""<!doctype html>
 <html lang="he" dir="rtl">
@@ -135,8 +163,13 @@ def render(
 </head>
 <body>
 <header>
+<div class="top">
+<div>
 <h1>ניטור חדשות - ERP, קופות וקמעונאות</h1>
 <div class="meta">עודכן: {generated_at.astimezone():%d/%m/%Y %H:%M} · מוצגות <span id="count">{len(items)}</span> ידיעות</div>
+</div>
+<div><button id="refresh" type="button">🔄 רענן עכשיו</button><div id="refresh-note"></div></div>
+</div>
 {warn}
 <div class="filters">{"".join(buttons)}<input id="q" type="search" placeholder="חיפוש..."></div>
 </header>

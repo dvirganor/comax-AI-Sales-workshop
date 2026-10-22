@@ -232,3 +232,69 @@ def test_report_render(matcher, store):
     assert 'href="https://a/x?a=1&amp;b=2"' in page
     assert "badge new" in page and "badge cyber" in page
     assert "ice" in page
+
+
+# ---------- נעילה ושרת מקומי ----------
+
+def test_run_lock(tmp_path):
+    from news_monitor.pipeline import run_lock
+
+    lock = tmp_path / "run.lock"
+    with run_lock(lock) as first:
+        assert first and lock.exists()
+        with run_lock(lock) as second:
+            assert second is False
+    assert not lock.exists()
+
+
+def test_server_refresh(tmp_path, monkeypatch):
+    import json
+    import threading
+    import urllib.error
+    import urllib.request
+
+    from news_monitor import server
+    from news_monitor.config import load_config, paths
+    from news_monitor.pipeline import RunResult
+
+    p = paths(load_config(), base=tmp_path)
+    release = threading.Event()
+    calls = []
+
+    def fake_run(config, secrets, paths_, force):
+        calls.append(force)
+        release.wait(5)
+        return RunResult(new_items=[])
+
+    controller = server.RefreshController(p, run=fake_run)
+    srv = server.make_server(p, 0, controller)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+
+    def request(path, method="GET", headers=None):
+        req = urllib.request.Request(base + path, method=method, headers=headers or {})
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status, r.read()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read()
+
+    try:
+        status, body = request("/")
+        assert status == 200 and "רענן עכשיו".encode() in body
+        assert request("/api/refresh", "POST")[0] == 403  # בלי הכותרת - חסום
+        hdr = {server.CSRF_HEADER: server.CSRF_VALUE}
+        assert request("/api/refresh", "POST", hdr)[0] == 202
+        assert request("/api/refresh", "POST", hdr)[0] == 409  # כבר רצה
+        assert json.loads(request("/api/status")[1])["running"] is True
+        release.set()
+        controller._thread.join(5)
+        st = json.loads(request("/api/status")[1])
+        assert st["running"] is False and st["message"] == "נמצאו 0 ידיעות חדשות"
+        assert calls == [True]
+        # סריקה מתוזמנת שרצה בתהליך אחר (קובץ נעילה) נחשבת "רצה"
+        p.lock.write_text("1")
+        assert request("/api/refresh", "POST", hdr)[0] == 409
+    finally:
+        srv.shutdown()
+        srv.server_close()

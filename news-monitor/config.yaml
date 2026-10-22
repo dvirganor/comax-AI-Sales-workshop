@@ -16,6 +16,10 @@ report:
   path: output/report.html
   days_to_show: 7
 
+# שרת מקומי שמציג את הדוח ומאפשר "רענן עכשיו" (זמין רק מהמחשב הזה)
+server:
+  port: 8765
+
 telegram_bot:
   enabled: true
   # לשלוח לבוט גם ידיעות "סייבר כללי" (שלא זוהתה בהן חברה מהרשימה)
