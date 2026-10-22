@@ -400,7 +400,7 @@ def test_ambiguous_aliases(matcher, title, expected):
         ("השבוע הזה לא נגמר: GitLab משחררת תיקון לחולשה קריטית", False),
         ("מתקפת סייבר גרמה להשבתת שירותים בעיר קולומביה שבדרום קרוליינה", False),
         ("מתקפת סייבר על חברת ביטוח ישראלית", True),
-        ("דליפת מידע מהאתר example.co.il", True),
+        ("דליפת מידע מהאתר example.co.il", False),  # כתובת בלבד אינה סימן לישראל
         ("Iranian hackers target Israeli logistics firm", True),
         ("פריצה למערכות של שופרסל", True),  # חברה מהרשימה - תמיד מוצג
     ],
@@ -413,3 +413,46 @@ def test_cyber_channel_israel_filter(matcher, text, shown):
 def test_compile_term_punctuation_edges():
     assert compile_term(".co.il").search("shufersal.co.il")
     assert compile_term('צה"ל').search('לפי צה"ל')
+
+
+def test_channel_footer_does_not_pass_israel_filter(matcher):
+    footer = "📢 ערוץ חדשות הסייבר של ישראל<br>לאתר: <a href='https://cybersecurityil.co.il'>cybersecurityil.co.il</a>"
+    posts = [
+        "חברת Quest Diagnostics מדווחת על גישה בלתי מורשית למערכת",
+        "קבוצת תקיפה טוענת שפרצה למשרד הכלכלה והתעשייה של כווית.",
+        "תוקפים פרצו לרשת של חברת Railway וגנבו מפתחות API",
+        "חברת שירותי הענן היפנית Onamae Desktop Cloud השביתה שרתים",
+        "מערך הסייבר הלאומי מזהיר מפני מתקפה על חברות ישראליות",
+    ]
+    html = "".join(
+        f'<div class="tgme_widget_message"><div class="tgme_widget_message_text">{p}<br><br>{footer}</div>'
+        f'<a class="tgme_widget_message_date" href="https://t.me/ch/{i}"></a></div>'
+        for i, p in enumerate(posts)
+    )
+    items = telegram_channel.parse(html, "ערוץ", include_unmatched="israel")
+    assert all("cybersecurityil" not in i.summary for i in items)
+    shown = [i.title for i in items if matcher.analyze(i)]
+    assert shown == ["מערך הסייבר הלאומי מזהיר מפני מתקפה על חברות ישראליות"]
+
+
+def test_code_watcher(tmp_path):
+    from news_monitor.server import CodeWatcher, code_signature
+
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "a.py").write_text("x = 1")
+    before = code_signature(pkg)
+    (pkg / "a.py").write_text("x = 2")
+    assert code_signature(pkg) != before
+
+    class Ctrl:
+        running = False
+
+    sig = {"v": "1"}
+    watcher = CodeWatcher(Ctrl(), signature=lambda: sig["v"])
+    assert watcher.should_restart() is False
+    sig["v"] = "2"
+    Ctrl.running = True
+    assert watcher.should_restart() is False  # לא באמצע סריקה
+    Ctrl.running = False
+    assert watcher.should_restart() is True

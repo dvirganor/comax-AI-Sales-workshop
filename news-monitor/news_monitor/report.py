@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from . import __version__
 from .store import StoredItem
 
 WEEKDAYS = ["שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת", "ראשון"]
@@ -186,7 +187,7 @@ def render(
 <div class="top">
 <div>
 <h1>ניטור חדשות - ERP, קופות וקמעונאות</h1>
-<div class="meta">עודכן: {generated_at.astimezone():%d/%m/%Y %H:%M} · מוצגות <span id="count">{len(items)}</span> ידיעות</div>
+<div class="meta">עודכן: {generated_at.astimezone():%d/%m/%Y %H:%M} · מוצגות <span id="count">{len(items)}</span> ידיעות · גרסה {__version__}</div>
 </div>
 <div><button id="refresh" type="button">🔄 רענן עכשיו</button><div id="refresh-note"></div></div>
 </div>

@@ -6,15 +6,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import subprocess
 import sys
 import threading
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from . import pipeline
-from .config import Paths, load_config
+from .config import BASE_DIR, Paths, load_config
 from .matcher import Matcher
 from .store import Store
 
@@ -163,6 +166,37 @@ def make_server(paths: Paths, port: int, controller: RefreshController | None = 
     return server
 
 
+def code_signature(package_dir: Path = Path(__file__).resolve().parent) -> str:
+    """טביעת אצבע של קוד האפליקציה - משתנה כשמחלצים גרסה חדשה מעל התיקייה."""
+    digest = hashlib.sha1()
+    for path in sorted(package_dir.rglob("*.py")):
+        digest.update(path.relative_to(package_dir).as_posix().encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+class CodeWatcher:
+    """מזהה שהקוד עודכן, ומבקש הפעלה מחדש רק כשאין סריקה באמצע."""
+
+    def __init__(self, controller: RefreshController, signature=code_signature):
+        self.controller = controller
+        self._signature = signature
+        self._initial = signature()
+
+    def should_restart(self) -> bool:
+        try:
+            changed = self._signature() != self._initial
+        except OSError:  # קובץ באמצע חילוץ - ננסה בבדיקה הבאה
+            return False
+        return changed and not self.controller.running
+
+
+def _spawn_new_instance() -> None:
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen([sys.executable, "-m", "news_monitor", "serve"], cwd=str(BASE_DIR),
+                     creationflags=flags, close_fds=True)
+
+
 def serve(paths: Paths, port: int) -> None:
     try:
         server = make_server(paths, port)
@@ -170,9 +204,24 @@ def serve(paths: Paths, port: int) -> None:
         log.info("האפליקציה כבר פועלת בפורט %d - אין צורך בהפעלה נוספת", port)
         return
     stop = threading.Event()
+    restart = threading.Event()
+    watcher = CodeWatcher(server.controller)
+
+    def watch() -> None:
+        while not stop.wait(30):
+            if watcher.should_restart():
+                restart.set()
+                server.shutdown()
+                return
+
     threading.Thread(target=AutoScheduler(server.controller).run_forever, args=(stop,), daemon=True).start()
+    threading.Thread(target=watch, daemon=True).start()
     log.info("האפליקציה פועלת: http://127.0.0.1:%d/", port)
     try:
         server.serve_forever()
     finally:
         stop.set()
+        server.server_close()  # משחרר את הפורט לפני שהמופע החדש עולה
+    if restart.is_set():
+        log.info("קוד האפליקציה עודכן - מפעיל מחדש")
+        _spawn_new_instance()
