@@ -36,23 +36,27 @@ def process(
 ) -> list[StoredItem]:
     oldest = now - timedelta(hours=max_age_hours)
     new: list[StoredItem] = []
-    seen_ids: set[str] = set()
-    seen_titles: set[str] = set()
+    # ידיעות שכבר טופלו בסריקה הזו: קישור/כותרת -> מזהה הידיעה השמורה
+    by_url: dict[str, str] = {}
+    by_title: dict[str, str] = {}
     for result in results:
         for item in result.items:
             if item.published and item.published < oldest:
                 continue
             iid, tkey = item_id(item.url), title_key(item.title)
-            if iid in seen_ids or tkey in seen_titles:
-                continue
-            match = matcher.analyze(item)
-            if match is None:
-                continue
-            seen_ids.add(iid)
-            seen_titles.add(tkey)
-            if store.seen(item, now=now):
-                continue
-            new.append(store.add(item, match, now))
+            existing = by_url.get(iid) or by_title.get(tkey)
+            if existing is None:
+                match = matcher.analyze(item)
+                if match is None:
+                    continue
+                existing = store.find(item, now=now)
+                if existing is None:
+                    stored = store.add(item, match, now)
+                    new.append(stored)
+                    existing = stored.id
+                by_url[iid] = by_title[tkey] = existing
+            # אותה ידיעה ממקור נוסף - נשמרת כקישור נוסף תחת אותה כותרת
+            store.add_link(existing, item)
     return new
 
 

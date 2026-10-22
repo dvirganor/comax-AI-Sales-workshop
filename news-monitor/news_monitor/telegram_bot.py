@@ -27,10 +27,16 @@ def format_item(item: StoredItem, tag_labels: dict[str, str]) -> str:
     tags = " ".join(f"#{tag_labels.get(t, t).replace(' ', '_').replace('/', '')}" for t in item.tags)
     who = ", ".join(item.entities)
     meta = " | ".join(x for x in (who, item.source) if x)
-    return (
+    text = (
         f'• <a href="{html.escape(item.url, quote=True)}">{html.escape(item.title)}</a>\n'
         f"  <i>{html.escape(meta)}</i>{(' ' + html.escape(tags)) if tags else ''}"
     )
+    if item.extra_links:
+        links = ", ".join(
+            f'<a href="{html.escape(url, quote=True)}">{html.escape(source)}</a>' for source, url in item.extra_links
+        )
+        text += f"\n  🔗 גם ב: {links}"
+    return text
 
 
 def build_messages(

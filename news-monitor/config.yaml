@@ -60,8 +60,8 @@ sources:
   # ערוצי טלגרם ציבוריים (נקראים דרך https://t.me/s/<handle>)
   telegram_channels:
     - name: חדשות הסייבר - ארז דסה
-      # יש להשלים את שם המשתמש של הערוץ: בטלגרם > פרטי הערוץ > הקישור t.me/XXXX
-      handle: ""
+      # https://t.me/CyberSecurityIL
+      handle: CyberSecurityIL
       # להציג גם פוסטים שלא זוהתה בהם חברה מהרשימה (בקטגוריית "סייבר כללי")
       include_unmatched: true
 

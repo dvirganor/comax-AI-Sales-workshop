@@ -162,6 +162,32 @@ def test_process_dedupes(matcher, store):
     assert [i.title for i in new] == ["שופרסל מוכרת סניפים"]
     # סריקה נוספת - אותו פריט לא נחשב חדש
     assert process(results, matcher, store, NOW + timedelta(hours=1), 72) == []
+    [pending] = store.pending_notifications()
+    # המקור השני נשמר כקישור נוסף, פעם אחת בלבד
+    assert pending.extra_links == [("B", "https://b/2")]
+
+
+def test_extra_sources_across_runs(matcher, store):
+    first = [SourceResult("a", [Item("טאביט מגייסת 20 מיליון", "https://globes/1", "גלובס", NOW)])]
+    later = [SourceResult("b", [
+        Item("טאביט מגייסת 20 מיליון", "https://ynet/9", "ynet", NOW),
+        Item("טאביט מגייסת 20 מיליון", "https://news.google.com/x", "גלובס", NOW),  # אותו מקור כמו הראשי
+        Item("טאביט מגייסת 20 מיליון", "https://calcalist/5", "כלכליסט", NOW),
+    ])]
+    assert len(process(first, matcher, store, NOW, 72)) == 1
+    assert process(later, matcher, store, NOW + timedelta(hours=1), 72) == []
+    [item] = store.recent(7, now=NOW)
+    assert item.url == "https://globes/1"
+    assert item.extra_links == [("ynet", "https://ynet/9"), ("כלכליסט", "https://calcalist/5")]
+    page = report.render([item], matcher.group_labels, matcher.tag_labels, NOW)
+    assert "גם ב:" in page and 'href="https://ynet/9"' in page
+    msg = telegram_bot.format_item(item, matcher.tag_labels)
+    assert '<a href="https://calcalist/5">כלכליסט</a>' in msg
+
+
+def test_pending_cleared(matcher, store):
+    results = [SourceResult("a", [Item("שופרסל מוכרת סניפים", "https://a/1", "A", NOW)])]
+    new = process(results, matcher, store, NOW, 72)
     assert len(store.pending_notifications()) == 1
     store.mark_notified([new[0].id])
     assert store.pending_notifications() == []

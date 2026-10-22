@@ -38,6 +38,8 @@ h2{font-size:15px;color:var(--muted);margin:22px 0 8px;border-bottom:1px solid v
 .badge.new{background:var(--new);color:#fff}
 .badge.cyber{background:var(--cyber);color:#fff}
 .badge.deal{background:var(--deal);color:#fff}
+.more{font-size:12.5px;margin-top:3px;color:var(--muted)}
+.more a{font-weight:400;color:var(--accent)}
 .empty{color:var(--muted);text-align:center;padding:40px}
 """
 
@@ -102,11 +104,18 @@ def render(
             sub.append("🏢 " + esc(", ".join(it.entities)))
         else:
             sub.append(esc(", ".join(labels)))
+        more = ""
+        if it.extra_links:
+            links = " · ".join(
+                f'<a href="{esc(url, quote=True)}" target="_blank" rel="noopener">{esc(source)}</a>'
+                for source, url in it.extra_links
+            )
+            more = f'<div class="more">🔗 גם ב: {links}</div>'
         body.append(
             f'<div class="item" data-groups="{esc(" ".join(it.groups))}" data-tags="{esc(" ".join(it.tags))}"'
             f' data-new="{1 if is_new else 0}">'
             f'<a href="{esc(it.url, quote=True)}" target="_blank" rel="noopener">{esc(it.title)}</a>'
-            f'<div class="sub">{"".join(badges)}<span>{" · ".join(sub)}</span></div></div>'
+            f'<div class="sub">{"".join(badges)}<span>{" · ".join(sub)}</span></div>{more}</div>'
         )
     if not items:
         body.append('<div class="empty">אין עדיין ידיעות. הדוח יתעדכן בסריקה הבאה.</div>')
