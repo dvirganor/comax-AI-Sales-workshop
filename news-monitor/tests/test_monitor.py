@@ -41,8 +41,10 @@ def store(tmp_path):
         ("שופרסל", "בשופרסלים", False),
         ("SAP", "פריצה ללקוחות של ה-SAP", True),
         ("SAP", "בSAP הודיעו", True),
-        ("SAP", "the sap of trees", False),
+        ("SAP", "the sap of trees", True),  # אין הבחנה בין אותיות גדולות לקטנות
         ("SAP", "SAPIENS acquires", False),
+        ("OTECH", "Otech reports a cyber incident", True),
+        ("OTECH", "otech", True),
         ("רמי לוי", "רמי  לוי פותח סניף", True),
         ("Nayax", "NAYAX reports results", True),
     ],

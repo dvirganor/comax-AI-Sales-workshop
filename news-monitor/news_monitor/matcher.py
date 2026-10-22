@@ -24,9 +24,6 @@ def _is_hebrew(text: str) -> bool:
 def compile_term(term: str) -> re.Pattern[str]:
     """מחזיר ביטוי רגולרי לזיהוי מונח, כולל תחיליות עבריות."""
     body = re.escape(term.strip()).replace(r"\ ", r"\s+")
-    # כינוי קצר באותיות גדולות בלבד (SAP, NCR, KSP) - רגיש לאותיות גדולות כדי לא לתפוס "sap"
-    case_sensitive = term.isascii() and term.upper() == term and len(term) <= 6
-    flags = 0 if case_sensitive else re.IGNORECASE
     term = term.strip()
     if _is_hebrew(term):
         before, after = rf"(?<!\w){_HEB_PREFIX}", r"(?!\w)"
@@ -38,7 +35,7 @@ def compile_term(term: str) -> re.Pattern[str]:
         before = ""
     if not (term[-1].isalnum() or term[-1] == "_"):
         after = ""
-    return re.compile(before + body + after, flags)
+    return re.compile(before + body + after, re.IGNORECASE)
 
 
 def alias_term(alias: str | dict) -> str:
