@@ -1,0 +1,197 @@
+# הגדרות מערכת ניטור החדשות
+# ------------------------------------------------------------
+# ניתן לערוך קובץ זה בחופשיות (שמירה בקידוד UTF-8).
+# סודות (טוקן של בוט טלגרם) נשמרים בקובץ נפרד: secrets.yaml (לא נשמר ב-git).
+
+schedule:
+  # ימים: 0=ראשון ... 6=שבת
+  days: [0, 1, 2, 3, 4]
+  start_hour: 8
+  end_hour: 18
+
+# פריטים שפורסמו לפני יותר מ-X שעות לא יוצגו (מונע הצפה של ארכיון ישן)
+max_age_hours: 72
+
+report:
+  path: output/report.html
+  days_to_show: 7
+
+telegram_bot:
+  enabled: true
+  # לשלוח לבוט גם ידיעות "סייבר כללי" (שלא זוהתה בהן חברה מהרשימה)
+  send_general_cyber: false
+
+http:
+  timeout_seconds: 20
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+
+# ------------------------------------------------------------
+# מקורות
+# ------------------------------------------------------------
+sources:
+  # חיפוש ב-Google News לפי שמות החברות (מכסה גלובס, דה מרקר, כלכליסט, ynet, N12, ice ועוד)
+  google_news:
+    enabled: true
+    entities_per_query: 6
+    # טווח זמן לחיפוש (when:1d = יממה אחרונה)
+    when: 1d
+
+  # פידים של RSS - מקורות ישירים
+  rss:
+    - name: ynet - חדשות
+      url: https://www.ynet.co.il/Integration/StoryRss2.xml
+    - name: ynet - כלכלה
+      url: https://www.ynet.co.il/Integration/StoryRss6.xml
+    - name: ynet - דיגיטל
+      url: https://www.ynet.co.il/Integration/StoryRss544.xml
+    - name: גלובס
+      url: https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585
+    - name: כלכליסט
+      url: https://www.calcalist.co.il/GeneralRSS/0,16335,L-8,00.xml
+    - name: דה מרקר
+      url: https://www.themarker.com/srv/tm-all-articles
+    - name: N12 - כסף
+      url: https://rcs.mako.co.il/rss/news-money.xml
+    - name: ice
+      url: https://www.ice.co.il/rss
+    - name: Geektime
+      url: https://www.geektime.co.il/feed/
+
+  # ערוצי טלגרם ציבוריים (נקראים דרך https://t.me/s/<handle>)
+  telegram_channels:
+    - name: חדשות הסייבר - ארז דסה
+      # יש להשלים את שם המשתמש של הערוץ: בטלגרם > פרטי הערוץ > הקישור t.me/XXXX
+      handle: ""
+      # להציג גם פוסטים שלא זוהתה בהם חברה מהרשימה (בקטגוריית "סייבר כללי")
+      include_unmatched: true
+
+  # קורבנות כופרה ישראליים שפורסמו באתרי ההדלפה (ransomware.live)
+  ransomware_live:
+    enabled: true
+    url: https://api.ransomware.live/v2/countryvictims/IL
+    include_unmatched: true
+
+# ------------------------------------------------------------
+# סיווג ידיעות לפי מילות מפתח בכותרת
+# ------------------------------------------------------------
+tags:
+  cyber:
+    label: סייבר
+    keywords: [סייבר, פריצה, פריצת, נפרץ, נפרצה, פרצו, האקר, האקרים, כופרה, כופר, דליפה, דליפת, דלף, דלפו, הודלף, הודלפו,
+               מתקפה, מתקפת, מתקפות, התקפת, תקיפה, תקיפת, חולשה, חולשת, חולשות, פישינג, השבתה, הושבת, הושבתה, מידע אישי, מאגר מידע,
+               cyber, hack, hacked, hackers, breach, ransomware, leak, leaked, phishing, vulnerability, CVE, DDoS]
+  deal:
+    label: עסקה / שינוי מבני
+    keywords: [רכישה, רכישת, רוכשת, רוכש, נרכשה, מיזוג, מתמזגת, מכירה, מכירת, מוכרת, נמכרה, נמכר, עסקה, עסקת,
+               שליטה, בעלי השליטה, הנפקה, מנפיקה, גיוס, השקעה, סניפים, סניף, סוגרת, סגירת, נסגרת, פותחת, פתיחת,
+               פשיטת רגל, הקפאת הליכים, כינוס, חדלות פירעון, הסדר חוב, פיטורים, מנכ"ל, מנכ״ל, יו"ר, יו״ר,
+               acquisition, acquire, acquires, merger, deal, IPO, stake, funding, raises, layoffs, CEO]
+
+# מילים שמספיקה הופעתן כדי לאשר שמדובר ברשת/חברה כאשר לשם החברה יש משמעות נוספת (require_context)
+context_words: [רשת, רשתות, הרשת, ברשת, סניף, סניפים, חנות, חנויות, קמעונאות, קמעונאית, קמעונאי, סופרמרקט,
+                סופר, מרכול, מרכולים, מותג, מותגים, מחזור, רווח, הכנסות, מכירות, דוחות, בורסה, מניה, מניית,
+                רכישה, מיזוג, עסקה, שליטה, צרכנות, לקוחות, קופות, קופה]
+
+# ------------------------------------------------------------
+# חברות לניטור
+# ------------------------------------------------------------
+# לכל חברה: name - שם לתצוגה, aliases - כינויים לזיהוי (עברית/אנגלית).
+# require_context: true - לשמות בעלי משמעות נוספת ("גולף", "פוקס") - נדרשת גם מילת הקשר מהרשימה למעלה.
+# כינויים באנגלית באותיות גדולות בלבד (כמו SAP, NCR) מזוהים רק באותיות גדולות.
+groups:
+  software:
+    label: בתי תוכנה / ERP / קופות
+    entities:
+      - name: ווריפון (Verifone)
+        aliases: [ווריפון, וריפון, Verifone]
+      - name: פריוריטי (Priority Software)
+        aliases: [פריוריטי, Priority Software, priority-software]
+      - name: SAP
+        aliases: [SAP, סאפ, אס.איי.פי]
+      - name: אופנת תוכנה (OTECH)
+        aliases: [OTECH, "אופנת תוכנה", אוטק]
+      - name: ניאקס (Nayax)
+        aliases: [ניאקס, Nayax]
+      - name: אביב קופות
+        aliases: ["אביב קופות", "אביב מערכות קופה", "Aviv POS"]
+      - name: ביקום (Beecomm)
+        aliases: [ביקום, Beecomm]
+      - name: טאביט (Tabit)
+        aliases: [טאביט, Tabit]
+      - name: NCR / NCR Voyix
+        aliases: [NCR, "NCR Voyix", "אן.סי.אר", "אן סי אר"]
+      - name: ריטליקס (Retalix)
+        aliases: [ריטליקס, רטליקס, Retalix]
+      - name: אוטוסופט
+        aliases: [אוטוסופט, Autosoft]
+      - name: דוקופוינט
+        aliases: [דוקופוינט, Docupoint, DocuPoint]
+      - name: שופיפיי (Shopify)
+        aliases: [שופיפיי, Shopify]
+
+  retail:
+    label: רשתות קמעונאות
+    entities:
+      # --- מזון ---
+      - {name: שופרסל, aliases: [שופרסל, Shufersal]}
+      - {name: רמי לוי, aliases: ["רמי לוי", "Rami Levy"]}
+      - {name: יוחננוף, aliases: [יוחננוף, Yochananof]}
+      - {name: ויקטורי, aliases: [ויקטורי], require_context: true}
+      - {name: אושר עד, aliases: ["אושר עד", "Osher Ad"]}
+      - {name: קרפור / יינות ביתן, aliases: [קרפור, Carrefour, "יינות ביתן", "אלקטרה צריכה"]}
+      - {name: טיב טעם, aliases: ["טיב טעם", "Tiv Taam"]}
+      - {name: חצי חינם, aliases: ["חצי חינם"]}
+      - {name: מחסני השוק, aliases: ["מחסני השוק"]}
+      - {name: יש / יש חסד, aliases: ["יש חסד", "רשת יש"]}
+      - {name: סטופ מרקט, aliases: ["סטופ מרקט"]}
+      - {name: קשת טעמים, aliases: ["קשת טעמים"]}
+      - {name: פרש מרקט, aliases: ["פרש מרקט", "Freshmarket"]}
+      - {name: AM:PM, aliases: ["AM:PM", "איי.אם פי.אם"]}
+      - {name: סופר יודה, aliases: ["סופר יודה"]}
+      - {name: נתיב החסד, aliases: ["נתיב החסד"]}
+      - {name: זול ובגדול, aliases: ["זול ובגדול"]}
+      - {name: מעיין 2000, aliases: ["מעיין 2000"]}
+      - {name: שוק העיר, aliases: ["שוק העיר"]}
+      - {name: קואופ, aliases: [קואופ], require_context: true}
+      - {name: דור אלון / אלונית, aliases: ["דור אלון", אלונית]}
+      # --- פארם ---
+      - {name: סופר-פארם, aliases: ["סופר-פארם", "סופר פארם", "Super-Pharm", "Super Pharm"]}
+      - {name: Be (שופרסל), aliases: ["רשת Be"]}
+      - {name: גוד פארם, aliases: ["גוד פארם", "Good Pharm"]}
+      - {name: ניו-פארם, aliases: ["ניו-פארם", "ניו פארם", "New Pharm"]}
+      # --- אופנה והנעלה ---
+      - {name: פוקס (Fox), aliases: [פוקס, "פוקס-ויזל", "פוקס ויזל"], require_context: true}
+      - {name: קסטרו, aliases: [קסטרו, Castro], require_context: true}
+      - {name: גולף, aliases: [גולף, "גולף אנד קו", "Golf & Co"], require_context: true}
+      - {name: דלתא גליל, aliases: ["דלתא גליל", "Delta Galil"]}
+      - {name: H&O, aliases: ["H&O"]}
+      - {name: רנואר, aliases: [רנואר, Renuar]}
+      - {name: הוניגמן, aliases: [הוניגמן, Honigman]}
+      - {name: המשביר לצרכן, aliases: [המשביר, "המשביר לצרכן"]}
+      - {name: טוונטי פור סבן, aliases: ["טוונטי פור סבן"]}
+      - {name: אינטימה, aliases: [אינטימה], require_context: true}
+      - {name: זארה ישראל, aliases: [זארה, Zara], require_context: true}
+      - {name: נעמן, aliases: [נעמן], require_context: true}
+      - {name: Terminal X, aliases: ["טרמינל איקס", "Terminal X", "טרמינל X"]}
+      - {name: מגה ספורט, aliases: ["מגה ספורט", "מגה-ספורט"]}
+      # --- בית, חשמל, טכנולוגיה ופנאי ---
+      - {name: הום סנטר, aliases: ["הום סנטר", "Home Center"]}
+      - {name: ACE, aliases: [ACE, אייס], require_context: true}
+      - {name: איקאה, aliases: [איקאה, IKEA]}
+      - {name: מחסני חשמל, aliases: ["מחסני חשמל"]}
+      - {name: שקם אלקטריק, aliases: ["שקם אלקטריק"]}
+      - {name: KSP, aliases: [KSP]}
+      - {name: באג, aliases: [באג, "באג מולטיסיסטם"], require_context: true}
+      - {name: iDigital, aliases: [iDigital, "איי דיגיטל"]}
+      - {name: אופיס דיפו, aliases: ["אופיס דיפו", "Office Depot"]}
+      - {name: ביתילי, aliases: [ביתילי]}
+      - {name: ורדינון, aliases: [ורדינון]}
+      - {name: מקס סטוק, aliases: ["מקס סטוק", "Max Stock"]}
+      - {name: טויס אר אס, aliases: ["טויס אר אס", "Toys R Us"]}
+      - {name: שילב, aliases: [שילב], require_context: true}
+      - {name: אוטו דיפו, aliases: ["אוטו דיפו"]}
+      - {name: לאסט פרייס, aliases: ["לאסט פרייס", "Last Price"]}
+      - {name: סטימצקי, aliases: [סטימצקי]}
+      - {name: צומת ספרים, aliases: ["צומת ספרים"]}
+      # --- ידיעות ענפיות כלליות ---
+      - {name: ענף הקמעונאות (כללי), aliases: ["רשתות השיווק", "רשתות המזון", "רשתות האופנה", "רשתות הקמעונאות", "ענף הקמעונאות"]}

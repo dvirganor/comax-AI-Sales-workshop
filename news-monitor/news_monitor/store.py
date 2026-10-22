@@ -1,0 +1,147 @@
+"""שמירת ידיעות ב-SQLite ומניעת כפילויות בין סריקות ובין מקורות."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from .models import Item, Match
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS items (
+    id         TEXT PRIMARY KEY,
+    title_key  TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    source     TEXT NOT NULL,
+    published  TEXT,
+    first_seen TEXT NOT NULL,
+    entities   TEXT NOT NULL,
+    groups_    TEXT NOT NULL,
+    tags       TEXT NOT NULL,
+    notified   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_items_title_key ON items(title_key);
+CREATE INDEX IF NOT EXISTS idx_items_first_seen ON items(first_seen);
+"""
+
+
+def normalize_url(url: str) -> str:
+    parts = urlsplit(url.strip())
+    query = [(k, v) for k, v in parse_qsl(parts.query) if not k.lower().startswith(("utm_", "fbclid", "gclid"))]
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), urlencode(query), ""))
+
+
+def title_key(title: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", title.lower())).strip()
+
+
+def item_id(url: str) -> str:
+    return hashlib.sha1(normalize_url(url).encode("utf-8")).hexdigest()
+
+
+@dataclass
+class StoredItem:
+    id: str
+    title: str
+    url: str
+    source: str
+    published: datetime | None
+    first_seen: datetime
+    entities: list[str]
+    groups: list[str]
+    tags: list[str]
+
+    @property
+    def when(self) -> datetime:
+        return self.published or self.first_seen
+
+
+class Store:
+    def __init__(self, path: str):
+        self.db = sqlite3.connect(path)
+        self.db.executescript(_SCHEMA)
+
+    def close(self) -> None:
+        self.db.close()
+
+    def is_empty(self) -> bool:
+        return self.db.execute("SELECT 1 FROM items LIMIT 1").fetchone() is None
+
+    def seen(self, item: Item, dedupe_days: int = 7, now: datetime | None = None) -> bool:
+        now = now or datetime.now().astimezone()
+        since = (now - timedelta(days=dedupe_days)).isoformat()
+        row = self.db.execute(
+            "SELECT 1 FROM items WHERE id = ? OR (title_key = ? AND first_seen >= ?) LIMIT 1",
+            (item_id(item.url), title_key(item.title), since),
+        ).fetchone()
+        return row is not None
+
+    def add(self, item: Item, match: Match, now: datetime) -> StoredItem:
+        stored = StoredItem(
+            id=item_id(item.url),
+            title=item.title,
+            url=item.url,
+            source=item.source,
+            published=item.published,
+            first_seen=now,
+            entities=match.entities,
+            groups=match.groups,
+            tags=match.tags,
+        )
+        self.db.execute(
+            "INSERT OR IGNORE INTO items (id, title_key, title, url, source, published, first_seen,"
+            " entities, groups_, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                stored.id,
+                title_key(item.title),
+                item.title,
+                item.url,
+                item.source,
+                item.published.isoformat() if item.published else None,
+                now.isoformat(),
+                json.dumps(match.entities, ensure_ascii=False),
+                json.dumps(match.groups),
+                json.dumps(match.tags),
+            ),
+        )
+        self.db.commit()
+        return stored
+
+    def mark_notified(self, ids: list[str]) -> None:
+        self.db.executemany("UPDATE items SET notified = 1 WHERE id = ?", [(i,) for i in ids])
+        self.db.commit()
+
+    def pending_notifications(self) -> list[StoredItem]:
+        return self._query("WHERE notified = 0 ORDER BY first_seen")
+
+    def recent(self, days: int, now: datetime | None = None) -> list[StoredItem]:
+        now = now or datetime.now().astimezone()
+        since = (now - timedelta(days=days)).isoformat()
+        items = self._query("WHERE first_seen >= ?", (since,))
+        return sorted(items, key=lambda s: s.when, reverse=True)
+
+    def _query(self, where: str, params: tuple = ()) -> list[StoredItem]:
+        rows = self.db.execute(
+            "SELECT id, title, url, source, published, first_seen, entities, groups_, tags FROM items " + where,
+            params,
+        ).fetchall()
+        return [
+            StoredItem(
+                id=r[0],
+                title=r[1],
+                url=r[2],
+                source=r[3],
+                published=datetime.fromisoformat(r[4]) if r[4] else None,
+                first_seen=datetime.fromisoformat(r[5]),
+                entities=json.loads(r[6]),
+                groups=json.loads(r[7]),
+                tags=json.loads(r[8]),
+            )
+            for r in rows
+        ]
