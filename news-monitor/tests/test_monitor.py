@@ -458,3 +458,39 @@ def test_code_watcher(tmp_path):
     assert watcher.should_restart() is False  # לא באמצע סריקה
     Ctrl.running = False
     assert watcher.should_restart() is True
+
+
+def test_otech_post_from_channel(matcher):
+    text = ("קבוצת הנדלה טוענת כי פרצה לרשת של חברת Otech המספקת מערכות לעמדות תשלום (POS).\n\n"
+            "הקבוצה מפרסמת מידע להורדה שגנבה לכאורה מהרשת של החברה.")
+    for item in (Item(text.splitlines()[0], "u", "ערוץ", summary=text, include_unmatched="israel"),
+                 Item(text.splitlines()[0], "u", "גלובס", summary=text)):
+        m = matcher.analyze(item)
+        assert m.entities == ["אופנת תוכנה (OTECH)"] and "cyber" in m.tags
+
+
+def test_telegram_pagination():
+    from datetime import timedelta
+
+    now = datetime.now(timezone.utc)
+
+    def page(ids, hours_ago):
+        return "".join(
+            f'<div class="tgme_widget_message"><div class="tgme_widget_message_text">פוסט {i}</div>'
+            f'<a class="tgme_widget_message_date" href="https://t.me/ch/{i}">'
+            f'<time datetime="{(now - timedelta(hours=h)).isoformat()}"></time></a></div>'
+            for i, h in zip(ids, hours_ago)
+        ).encode()
+
+    session = _FakeSession({
+        "https://t.me/s/ch": _Resp(200, page([30, 31, 32], [3, 2, 1])),
+        "https://t.me/s/ch?before=30": _Resp(200, page([20, 21, 22], [30, 20, 10])),
+        "https://t.me/s/ch?before=20": _Resp(200, page([10, 11, 12], [100, 90, 80])),  # ישנים מ-72 שעות
+        "https://t.me/s/ch?before=10": _Resp(200, page([1, 2, 3], [200, 190, 180])),
+    })
+    items = telegram_channel.fetch(session, "ערוץ", "ch", 5, False, max_age_hours=72)
+    assert "https://t.me/s/ch?before=10" not in session.requested  # עצר אחרי הדף הישן
+    assert len(items) == 9
+    # עמוד ראשון בלבד כשהכל חדש וכבר אין דפים נוספים
+    one = _FakeSession({"https://t.me/s/ch": _Resp(200, page([5, 6], [1, 1]))})
+    assert len(telegram_channel.fetch(one, "ערוץ", "@ch", 5, False)) == 2

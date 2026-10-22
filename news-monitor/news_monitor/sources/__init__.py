@@ -54,7 +54,7 @@ def build_fetchers(config: dict) -> list[tuple[str, Callable[[requests.Session, 
             (
                 f"טלגרם: {ch['name']}",
                 lambda s, t, c=ch: telegram_channel.fetch(
-                    s, c["name"], c["handle"], t, c.get("include_unmatched", False)
+                    s, c["name"], c["handle"], t, c.get("include_unmatched", False), config.get("max_age_hours", 72)
                 ),
             )
         )
