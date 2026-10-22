@@ -53,11 +53,11 @@ sources:
     - name: Geektime
       url: https://www.geektime.co.il/feed/
     # כלכליסט חוסם קריאת RSS (שגיאה 403) - הכתבות שלו מגיעות דרך Google News
-    - name: חדשות הסייבר - ארז דסה (אתר)
-      # אם הכתובת לא מחזירה פיד, המערכת מחפשת את הפיד באתר בעצמה
-      url: https://cybersecurityil.co.il/
-      # אתר ייעודי לסייבר: להציג גם ידיעות שלא זוהתה בהן חברה מהרשימה ("סייבר כללי")
-      include_unmatched: true
+    # האתר של ארז דסה (cybersecurityil.co.il) כבוי: אין בו פיד RSS, ואותן ידיעות מגיעות מערוץ הטלגרם שלו.
+    # להפעלה מחדש יש להסיר את סימני ה-# משלוש השורות הבאות.
+    # - name: חדשות הסייבר - ארז דסה (אתר)
+    #   url: https://cybersecurityil.co.il/
+    #   include_unmatched: true
 
   # ערוצי טלגרם ציבוריים (נקראים דרך https://t.me/s/<handle>)
   telegram_channels:

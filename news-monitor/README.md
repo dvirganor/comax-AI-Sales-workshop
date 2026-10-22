@@ -15,7 +15,6 @@
 |---|---|
 | Google News (בעברית, ישראל) | חיפוש לפי שמות החברות. מכסה את גלובס, דה מרקר, כלכליסט, ynet, N12, ice ואתרים נוספים |
 | ynet, גלובס, דה מרקר, N12, ice, Geektime | פידים של RSS. כלכליסט חוסם קריאת RSS, ולכן הכתבות שלו מגיעות דרך Google News |
-| "חדשות הסייבר - ארז דסה": האתר [cybersecurityil.co.il](https://cybersecurityil.co.il/) | פיד RSS. המערכת מאתרת את כתובת הפיד באתר בעצמה |
 | טלגרם: "חדשות הסייבר - ארז דסה" ([t.me/CyberSecurityIL](https://t.me/CyberSecurityIL)) | תצוגת הרשת הציבורית `t.me/s/CyberSecurityIL`, בלי התחברות |
 | ransomware.live | קורבנות כופרה ישראליים שפורסמו באתרי הדלפה |
 
