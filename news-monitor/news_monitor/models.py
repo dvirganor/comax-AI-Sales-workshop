@@ -14,8 +14,9 @@ class Item:
     published: datetime | None = None
     # טקסט נוסף לזיהוי חברות (תקציר RSS, גוף פוסט בטלגרם, אתר של קורבן כופרה)
     summary: str = ""
-    # האם להציג את הידיעה גם אם לא זוהתה בה חברה מהרשימה ("סייבר כללי")
-    include_unmatched: bool = False
+    # האם להציג את הידיעה גם אם לא זוהתה בה חברה מהרשימה ("סייבר כללי"):
+    # True - תמיד, "israel" - רק אם היא קשורה לישראל, False - לא
+    include_unmatched: bool | str = False
 
 
 @dataclass

@@ -374,3 +374,42 @@ def test_second_server_instance_exits_quietly(tmp_path):
         server.serve(p, first.server_address[1])
     finally:
         first.server_close()
+
+
+# ---------- מקרים אמיתיים מהשימוש ----------
+
+@pytest.mark.parametrize(
+    "title,expected",
+    [
+        ("קלייפייס מוכיח ש-DC מוכנה להגעיל - ביקורת סרט האימה ביקום של באטמן", []),
+        ("ביקום משיקה מערכת קופות חדשה למסעדות", ["ביקום (Beecomm)"]),
+        ("Beecomm raises $10M", ["ביקום (Beecomm)"]),
+        ("טיפים לגלישת סאפ בים", []),
+        ("סאפ ישראל מעדכנת את מערכת ה-ERP", ["SAP"]),
+    ],
+)
+def test_ambiguous_aliases(matcher, title, expected):
+    m = matcher.analyze(Item(title, "u", "s"))
+    assert (m.entities if m else []) == expected
+
+
+@pytest.mark.parametrize(
+    "text,shown",
+    [
+        ('שפע של "הזדמנויות עסקיות" בטלגרם', False),
+        ("השבוע הזה לא נגמר: GitLab משחררת תיקון לחולשה קריטית", False),
+        ("מתקפת סייבר גרמה להשבתת שירותים בעיר קולומביה שבדרום קרוליינה", False),
+        ("מתקפת סייבר על חברת ביטוח ישראלית", True),
+        ("דליפת מידע מהאתר example.co.il", True),
+        ("Iranian hackers target Israeli logistics firm", True),
+        ("פריצה למערכות של שופרסל", True),  # חברה מהרשימה - תמיד מוצג
+    ],
+)
+def test_cyber_channel_israel_filter(matcher, text, shown):
+    item = Item(text, "u", "ערוץ", include_unmatched="israel")
+    assert (matcher.analyze(item) is not None) is shown
+
+
+def test_compile_term_punctuation_edges():
+    assert compile_term(".co.il").search("shufersal.co.il")
+    assert compile_term('צה"ל').search('לפי צה"ל')

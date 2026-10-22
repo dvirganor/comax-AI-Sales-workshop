@@ -7,6 +7,7 @@ from urllib.parse import quote
 import feedparser
 import requests
 
+from ..matcher import alias_term
 from ..models import Item
 from .rss import clean_html, entry_published
 
@@ -23,7 +24,7 @@ def build_queries(groups: dict, per_query: int) -> list[str]:
     for group in groups.values():
         for ent in group["entities"]:
             # שני הכינויים הראשונים של כל חברה (בד"כ עברית + אנגלית)
-            terms.append(" OR ".join(_quote_term(a) for a in ent["aliases"][:2]))
+            terms.append(" OR ".join(_quote_term(alias_term(a)) for a in ent["aliases"][:2]))
     return [" OR ".join(terms[i : i + per_query]) for i in range(0, len(terms), per_query)]
 
 
