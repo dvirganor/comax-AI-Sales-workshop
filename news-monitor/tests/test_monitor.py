@@ -326,3 +326,51 @@ def test_report_sources_panel(matcher):
                          sources={"ynet": 30, "כלכליסט": "403 Forbidden"})
     assert "מצב מקורות: 1 מתוך 2 תקינים" in page
     assert "✓ ynet: 30 פריטים" in page and "✗ כלכליסט: 403 Forbidden" in page
+
+
+# ---------- תזמון פנימי באפליקציה ----------
+
+@pytest.mark.parametrize(
+    "now,expected",
+    [
+        (datetime(2026, 10, 25, 9, 30), datetime(2026, 10, 25, 10, 0)),  # ראשון באמצע היום
+        (datetime(2026, 10, 25, 18, 5), datetime(2026, 10, 26, 8, 0)),   # אחרי 18:00 -> מחר 08:00
+        (datetime(2026, 10, 29, 18, 0), datetime(2026, 11, 1, 8, 0)),    # חמישי ערב -> ראשון
+        (datetime(2026, 10, 25, 6, 0), datetime(2026, 10, 25, 8, 0)),    # לפני תחילת היום
+    ],
+)
+def test_next_scheduled(config, now, expected):
+    from news_monitor.pipeline import next_scheduled
+
+    assert next_scheduled(config, now) == expected
+
+
+def test_auto_scheduler_once_per_hour(config):
+    from news_monitor.server import AutoScheduler
+
+    class Ctrl:
+        starts = 0
+
+        def start(self):
+            Ctrl.starts += 1
+            return True
+
+    sched = AutoScheduler(Ctrl())
+    assert sched.tick(datetime(2026, 10, 25, 9, 0, 10), config) is True      # תחילת שעה בחלון
+    assert sched.tick(datetime(2026, 10, 25, 9, 40), config) is False        # אותה שעה - לא שוב
+    assert sched.tick(datetime(2026, 10, 25, 10, 0, 20), config) is True     # שעה חדשה
+    assert sched.tick(datetime(2026, 10, 30, 10, 0), config) is False        # שישי - מחוץ לחלון
+    assert Ctrl.starts == 2
+
+
+def test_second_server_instance_exits_quietly(tmp_path):
+    from news_monitor import server
+    from news_monitor.config import load_config, paths
+
+    p = paths(load_config(), base=tmp_path)
+    first = server.make_server(p, 0)
+    try:
+        # serve() על פורט תפוס חוזר מיד בלי חריגה
+        server.serve(p, first.server_address[1])
+    finally:
+        first.server_close()

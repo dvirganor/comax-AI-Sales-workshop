@@ -61,6 +61,16 @@ def in_schedule(config: dict, now: datetime) -> bool:
     return day in sched["days"] and sched["start_hour"] <= now.hour <= sched["end_hour"]
 
 
+def next_scheduled(config: dict, now: datetime) -> datetime | None:
+    """השעה העגולה הבאה שבה תתבצע סריקה אוטומטית."""
+    slot = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    for _ in range(8 * 24):
+        if in_schedule(config, slot):
+            return slot
+        slot += timedelta(hours=1)
+    return None
+
+
 def process(
     results: list[SourceResult], matcher: Matcher, store: Store, now: datetime, max_age_hours: int
 ) -> list[StoredItem]:

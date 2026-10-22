@@ -78,14 +78,18 @@ async function waitDone(){
   catch(e){btn.disabled=false;btn.textContent='🔄 רענן עכשיו';note.textContent='השרת המקומי לא מגיב';return;}}}
 btn.onclick=async()=>{
  if(location.protocol==='file:'){
-  note.textContent='לסריקה מיידית פתח את הדוח דרך scripts\\\\open_report.bat (או הרץ run_now.bat)';return;}
+  note.textContent='לסריקה מיידית פתח את האפליקציה דרך NewsMonitor.bat או קיצור הדרך News Monitor בשולחן העבודה';return;}
  busy();
  try{const r=await fetch('/api/refresh',{method:'POST',headers:{'X-Requested-With':'news-monitor'}});
   if(r.status!==202&&r.status!==409)throw new Error(r.status);
   waitDone();}
  catch(e){btn.disabled=false;btn.textContent='🔄 רענן עכשיו';note.textContent='לא ניתן להפעיל סריקה: '+e.message;}};
+function nextScan(iso){if(!iso)return '';const d=new Date(iso);
+ return 'סריקה אוטומטית הבאה: יום '+d.toLocaleDateString('he-IL',{weekday:'long'}).replace('יום ','')+' '+
+  d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});}
 if(location.protocol!=='file:'){fetch('/api/status',{cache:'no-store'}).then(r=>r.json())
- .then(s=>{if(s.running){busy();waitDone();}else if(s.message)note.textContent=s.message;}).catch(()=>{});}
+ .then(s=>{if(s.running){busy();waitDone();}
+  else note.textContent=[s.message,nextScan(s.next_scan)].filter(Boolean).join(' · ');}).catch(()=>{});}
 """
 
 

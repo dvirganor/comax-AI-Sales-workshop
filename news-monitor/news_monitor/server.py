@@ -1,12 +1,14 @@
-"""שרת מקומי שמציג את הדוח ומאפשר להפעיל סריקה ידנית מכפתור "רענן עכשיו".
+"""האפליקציה המקומית: מציגה את הדוח, מריצה סריקה מכפתור "רענן עכשיו",
+ומריצה סריקה אוטומטית בכל שעה עגולה בחלון הזמנים שב-config.yaml.
 
-מאזין רק ל-127.0.0.1, כך שהוא נגיש מהמחשב הזה בלבד.
+מאזינה רק ל-127.0.0.1, כך שהיא נגישה מהמחשב הזה בלבד.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import sys
 import threading
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,7 +26,7 @@ CSRF_VALUE = "news-monitor"
 
 
 class RefreshController:
-    """מריץ סריקה ידנית ברקע, אחת בכל פעם."""
+    """מריץ סריקה ברקע (ידנית או אוטומטית), אחת בכל פעם."""
 
     def __init__(self, paths: Paths, run=pipeline.run):
         self.paths = paths
@@ -55,14 +57,48 @@ class RefreshController:
             else:
                 self.message = f"נמצאו {len(result.new_items)} ידיעות חדשות"
         except Exception as exc:
-            log.exception("סריקה ידנית נכשלה")
+            log.exception("הסריקה נכשלה")
             self.message = f"הסריקה נכשלה: {exc}"
 
     def status(self) -> dict:
         last_run = None
         if self.paths.status.exists():
             last_run = json.loads(self.paths.status.read_text(encoding="utf-8")).get("last_run")
-        return {"running": self.running, "last_run": last_run, "message": self.message}
+        next_scan = pipeline.next_scheduled(load_config(), datetime.now().astimezone())
+        return {
+            "running": self.running,
+            "last_run": last_run,
+            "next_scan": next_scan.isoformat() if next_scan else None,
+            "message": self.message,
+        }
+
+
+class AutoScheduler:
+    """מפעיל סריקה פעם אחת בכל שעה שנמצאת בחלון הזמנים (ראשונה ברגע שהאפליקציה עולה)."""
+
+    def __init__(self, controller: RefreshController, interval_seconds: int = 30):
+        self.controller = controller
+        self.interval = interval_seconds
+        self.last_slot: str | None = None
+
+    def tick(self, now: datetime, config: dict) -> bool:
+        if not pipeline.in_schedule(config, now):
+            return False
+        slot = now.strftime("%Y-%m-%d %H")
+        if slot == self.last_slot:
+            return False
+        self.last_slot = slot
+        log.info("סריקה אוטומטית (%02d:00)", now.hour)
+        return self.controller.start()
+
+    def run_forever(self, stop: threading.Event) -> None:
+        while True:
+            try:
+                self.tick(datetime.now().astimezone(), load_config())
+            except Exception:  # שגיאה בקובץ ההגדרות וכו' - לא עוצרים את התזמון
+                log.exception("שגיאה בתזמון הסריקה")
+            if stop.wait(self.interval):
+                return
 
 
 def make_handler(paths: Paths, controller: RefreshController):
@@ -112,13 +148,31 @@ def make_handler(paths: Paths, controller: RefreshController):
     return Handler
 
 
+class _Server(ThreadingHTTPServer):
+    # ב-Windows, SO_REUSEADDR מאפשר לשני תהליכים להאזין לאותו פורט - שם מכבים אותו
+    # כדי שהפעלה כפולה של האפליקציה תיכשל בבירור במקום להתנגש
+    allow_reuse_address = sys.platform != "win32"
+    daemon_threads = True
+
+
 def make_server(paths: Paths, port: int, controller: RefreshController | None = None) -> ThreadingHTTPServer:
     paths.db.parent.mkdir(parents=True, exist_ok=True)
     controller = controller or RefreshController(paths)
-    return ThreadingHTTPServer(("127.0.0.1", port), make_handler(paths, controller))
+    server = _Server(("127.0.0.1", port), make_handler(paths, controller))
+    server.controller = controller
+    return server
 
 
 def serve(paths: Paths, port: int) -> None:
-    server = make_server(paths, port)
-    log.info("השרת המקומי פועל: http://127.0.0.1:%d/", port)
-    server.serve_forever()
+    try:
+        server = make_server(paths, port)
+    except OSError:
+        log.info("האפליקציה כבר פועלת בפורט %d - אין צורך בהפעלה נוספת", port)
+        return
+    stop = threading.Event()
+    threading.Thread(target=AutoScheduler(server.controller).run_forever, args=(stop,), daemon=True).start()
+    log.info("האפליקציה פועלת: http://127.0.0.1:%d/", port)
+    try:
+        server.serve_forever()
+    finally:
+        stop.set()
