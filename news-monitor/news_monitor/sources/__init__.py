@@ -39,7 +39,12 @@ def build_fetchers(config: dict) -> list[tuple[str, Callable[[requests.Session, 
             )
 
     for feed in src.get("rss", []) or []:
-        fetchers.append((feed["name"], lambda s, t, f=feed: rss.fetch(s, f["name"], f["url"], t)))
+        fetchers.append(
+            (
+                feed["name"],
+                lambda s, t, f=feed: rss.fetch(s, f["name"], f["url"], t, f.get("include_unmatched", False)),
+            )
+        )
 
     for ch in src.get("telegram_channels", []) or []:
         if not ch.get("handle"):

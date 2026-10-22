@@ -60,6 +60,10 @@ sources:
       url: https://www.ice.co.il/rss
     - name: Geektime
       url: https://www.geektime.co.il/feed/
+    - name: חדשות הסייבר - ארז דסה (אתר)
+      url: https://cybersecurityil.co.il/feed/
+      # אתר ייעודי לסייבר: להציג גם ידיעות שלא זוהתה בהן חברה מהרשימה ("סייבר כללי")
+      include_unmatched: true
 
   # ערוצי טלגרם ציבוריים (נקראים דרך https://t.me/s/<handle>)
   telegram_channels:

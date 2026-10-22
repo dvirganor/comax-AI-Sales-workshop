@@ -91,6 +91,8 @@ RSS = b"""<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><tit
 def test_rss_parse():
     items = rss.parse(RSS, "ynet")
     assert len(items) == 1
+    assert items[0].include_unmatched is False
+    assert rss.parse(RSS, "cyber", include_unmatched=True)[0].include_unmatched is True
     assert items[0].title == "שופרסל & co"
     assert items[0].summary == "text"
     assert items[0].published == datetime(2026, 10, 21, 8, tzinfo=timezone.utc)

@@ -25,7 +25,7 @@ def entry_published(entry) -> datetime | None:
     return None
 
 
-def parse(content: bytes, source_name: str) -> list[Item]:
+def parse(content: bytes, source_name: str, include_unmatched: bool = False) -> list[Item]:
     feed = feedparser.parse(content)
     if feed.bozo and not feed.entries:
         raise ValueError(f"פיד לא תקין: {feed.get('bozo_exception')}")
@@ -42,12 +42,13 @@ def parse(content: bytes, source_name: str) -> list[Item]:
                 source=source_name,
                 published=entry_published(entry),
                 summary=clean_html(entry.get("summary", ""))[:1000],
+                include_unmatched=include_unmatched,
             )
         )
     return items
 
 
-def fetch(session: requests.Session, name: str, url: str, timeout: int) -> list[Item]:
+def fetch(session: requests.Session, name: str, url: str, timeout: int, include_unmatched: bool = False) -> list[Item]:
     resp = session.get(url, timeout=timeout)
     resp.raise_for_status()
-    return parse(resp.content, name)
+    return parse(resp.content, name, include_unmatched)
